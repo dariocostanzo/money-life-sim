@@ -65,3 +65,29 @@ export function calculateAnnualTakeHome(annualSalary: number): number {
 export function calculateMonthlyTakeHome(annualSalary: number): number {
   return calculateAnnualTakeHome(annualSalary) / 12
 }
+
+export type PayBreakdown = {
+  annualSalary: number
+  annualIncomeTax: number
+  annualNationalInsurance: number
+  annualTakeHome: number
+  monthlyIncomeTax: number
+  monthlyNationalInsurance: number
+  monthlyTakeHome: number
+}
+
+export function calculatePayBreakdown(annualSalary: number): PayBreakdown {
+  const annualIncomeTax = calculateIncomeTax(annualSalary)
+  const annualNationalInsurance = calculateNationalInsurance(annualSalary)
+  const annualTakeHome = annualSalary - annualIncomeTax - annualNationalInsurance
+
+  return {
+    annualSalary,
+    annualIncomeTax,
+    annualNationalInsurance,
+    annualTakeHome,
+    monthlyIncomeTax: annualIncomeTax / 12,
+    monthlyNationalInsurance: annualNationalInsurance / 12,
+    monthlyTakeHome: annualTakeHome / 12,
+  }
+}

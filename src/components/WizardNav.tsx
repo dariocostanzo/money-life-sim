@@ -1,18 +1,16 @@
 type WizardNavProps = {
   onPrevious: () => void
-  canGoPrevious: boolean
 }
 
-export function WizardNav({ onPrevious, canGoPrevious }: WizardNavProps) {
+export function WizardNav({ onPrevious }: WizardNavProps) {
   return (
-    <div className="mx-auto mt-10 flex max-w-3xl items-center justify-start">
+    <div className="mx-auto mt-6 flex max-w-3xl items-center justify-start sm:mt-10">
       <button
         type="button"
         onClick={onPrevious}
-        disabled={!canGoPrevious}
-        className="rounded-2xl px-6 py-3 text-base font-extrabold shadow-md transition-all duration-200 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none enabled:bg-white enabled:text-indigo-900 enabled:hover:-translate-y-0.5 enabled:hover:shadow-xl sm:text-lg"
+        className="w-full min-h-[48px] rounded-2xl bg-white px-6 py-3 text-base font-extrabold text-indigo-900 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 sm:w-auto sm:min-h-0 sm:text-lg sm:active:scale-100"
       >
-        ⬅️ Previous
+        <span aria-hidden="true">⬅️</span> Previous
       </button>
     </div>
   )

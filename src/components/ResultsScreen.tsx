@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { foodOptions } from '../data/food'
 import { savingsOptions } from '../data/savings'
-import { calculateMoneyLeft, calculateSavingsAmount } from '../lib/budgetCalculations'
+import { applyLocationMultiplier, calculateMoneyLeft, calculateSavingsAmount } from '../lib/budgetCalculations'
 import { calculateFinancialHealthScore, getFinancialHealthFeedback } from '../lib/financialHealth'
 import { formatGBP } from '../lib/formatMoney'
 import type { StepId } from '../lib/steps'
@@ -13,7 +13,7 @@ import { SavingsSelector } from './SavingsSelector'
 import { StepHeading } from './StepHeading'
 
 /** Gives the player a moment to see a card highlight before the stage changes. */
-const ADVANCE_DELAY_MS = 450
+const ADVANCE_DELAY_MS = 300
 
 type ResultsStage = 'food' | 'savings' | 'summary'
 
@@ -22,6 +22,7 @@ type ResultsScreenProps = {
   monthlyHousingCost: number
   monthlyUtilitiesCost: number
   monthlyTransportCost: number
+  locationMultiplier: number
   selectedFoodId: string | null
   onSelectFood: (foodId: string) => void
   selectedSavingsId: string | null
@@ -35,6 +36,7 @@ export function ResultsScreen({
   monthlyHousingCost,
   monthlyUtilitiesCost,
   monthlyTransportCost,
+  locationMultiplier,
   selectedFoodId,
   onSelectFood,
   selectedSavingsId,
@@ -46,10 +48,22 @@ export function ResultsScreen({
     selectedFoodId && selectedSavingsId ? 'summary' : 'food',
   )
 
+  const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [stage])
+
+  useEffect(() => {
+    return () => {
+      if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current)
+    }
+  }, [])
+
   const selectedFood = foodOptions.find((option) => option.id === selectedFoodId) ?? null
   const selectedSavings = savingsOptions.find((option) => option.id === selectedSavingsId) ?? null
 
-  const monthlyFoodCost = selectedFood?.monthlyCost ?? 0
+  const monthlyFoodCost = selectedFood ? applyLocationMultiplier(selectedFood.monthlyCost, locationMultiplier) : 0
   const monthlySavings = selectedSavings ? calculateSavingsAmount(monthlyIncome, selectedSavings.percentOfIncome) : 0
 
   const moneyLeftAfterEssentials = calculateMoneyLeft(monthlyIncome, [
@@ -66,20 +80,26 @@ export function ResultsScreen({
   const moneyLeftOver = moneyLeftAfterFood - monthlySavings
 
   function handleSelectFood(foodId: string) {
+    if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current)
     onSelectFood(foodId)
-    setTimeout(() => setStage(selectedSavingsId ? 'summary' : 'savings'), ADVANCE_DELAY_MS)
+    advanceTimeoutRef.current = setTimeout(() => setStage(selectedSavingsId ? 'summary' : 'savings'), ADVANCE_DELAY_MS)
   }
 
   function handleSelectSavings(savingsId: string) {
+    if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current)
     onSelectSavings(savingsId)
-    setTimeout(() => setStage('summary'), ADVANCE_DELAY_MS)
+    advanceTimeoutRef.current = setTimeout(() => setStage('summary'), ADVANCE_DELAY_MS)
   }
 
   if (stage === 'food') {
     return (
       <div>
-        <MoneyCheckBanner moneyLeft={moneyLeftAfterEssentials} question="🤔 But what about food?" />
-        <FoodSelector selectedFoodId={selectedFoodId} onSelectFood={handleSelectFood} />
+        <MoneyCheckBanner moneyLeft={moneyLeftAfterEssentials} icon="🤔" question="But what about food?" />
+        <FoodSelector
+          selectedFoodId={selectedFoodId}
+          onSelectFood={handleSelectFood}
+          locationMultiplier={locationMultiplier}
+        />
       </div>
     )
   }
@@ -87,7 +107,7 @@ export function ResultsScreen({
   if (stage === 'savings') {
     return (
       <div>
-        <MoneyCheckBanner moneyLeft={moneyLeftAfterFood} question="💰 What about savings?" />
+        <MoneyCheckBanner moneyLeft={moneyLeftAfterFood} icon="💰" question="What about savings?" />
         <SavingsSelector
           monthlyIncome={monthlyIncome}
           selectedSavingsId={selectedSavingsId}
@@ -103,13 +123,17 @@ export function ResultsScreen({
 
   return (
     <div>
-      <StepHeading icon="🏆" title="Your Results" />
+      <StepHeading key={stage} icon="🏆" title="Your Results" />
 
-      <p className="mb-6 text-center text-xl font-extrabold sm:text-2xl">
+      <p className="mb-6 animate-fade-in-up text-center text-xl font-extrabold sm:text-2xl">
         {isShort ? (
-          <span className="text-orange-600">⚠️ You're overspending by {formatGBP(Math.abs(moneyLeftOver))} a month.</span>
+          <span className="text-orange-700">
+            <span aria-hidden="true">⚠️</span> You're overspending by {formatGBP(Math.abs(moneyLeftOver))} a month.
+          </span>
         ) : (
-          <span className="text-green-600">✅ You have {formatGBP(moneyLeftOver)} left over every month!</span>
+          <span className="text-green-700">
+            <span aria-hidden="true">✅</span> You have {formatGBP(moneyLeftOver)} left over every month!
+          </span>
         )}
       </p>
 
@@ -123,11 +147,14 @@ export function ResultsScreen({
         moneyLeftOver={moneyLeftOver}
       />
 
-      <div className="mx-auto mt-8 flex max-w-xl flex-col items-center gap-3 rounded-3xl border-4 border-yellow-400 bg-gradient-to-b from-yellow-50 to-orange-100 p-6 text-center shadow-xl">
-        <p className="text-sm font-bold uppercase tracking-wide text-indigo-700">Financial Health Score</p>
-        <p className="text-6xl font-extrabold text-indigo-900">{score}</p>
+      <div className="mx-auto mt-8 flex max-w-xl animate-fade-in-up flex-col items-center gap-3 rounded-3xl border-4 border-yellow-400 bg-gradient-to-b from-yellow-50 to-orange-100 p-6 text-center shadow-xl [animation-delay:150ms]">
+        <h3 className="text-sm font-bold uppercase tracking-wide text-indigo-700">Financial Health Score</h3>
+        <p className="animate-pop-in text-6xl font-extrabold text-indigo-900 [animation-delay:250ms]">
+          {score}
+          <span className="text-2xl text-indigo-700">/100</span>
+        </p>
         <p className="text-2xl font-extrabold text-indigo-900">
-          {feedback.emoji} {feedback.label}
+          <span aria-hidden="true">{feedback.emoji}</span> {feedback.label}
         </p>
         <p className="text-base text-indigo-700">{feedback.message}</p>
       </div>
@@ -135,6 +162,7 @@ export function ResultsScreen({
       <ReflectionPrompts
         prompts={[
           { label: 'Try another career', icon: '💼', onClick: () => onJumpToStep('career') },
+          { label: 'Change location', icon: '📍', onClick: () => onJumpToStep('location') },
           { label: 'Change housing', icon: '🏠', onClick: () => onJumpToStep('housing') },
           { label: 'Change energy', icon: '⚡', onClick: () => onJumpToStep('utilities') },
           { label: 'Change transport', icon: '🚌', onClick: () => onJumpToStep('transport') },
@@ -147,9 +175,9 @@ export function ResultsScreen({
         <button
           type="button"
           onClick={onRestart}
-          className="rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 px-8 py-3 text-lg font-extrabold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"
+          className="w-full min-h-[52px] rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 px-8 py-3 text-lg font-extrabold text-white shadow-md transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xl active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 sm:w-auto sm:min-h-0"
         >
-          🔁 Play Again
+          <span aria-hidden="true">🔁</span> Play Again
         </button>
       </div>
     </div>
