@@ -1,12 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { careers } from './data/careers'
+import { locations } from './data/locations'
 import { housingOptions } from './data/housing'
 import { utilitiesOptions } from './data/utilities'
 import { transportOptions } from './data/transport'
-import { calculateMonthlyTakeHome } from './lib/payCalculations'
+import { calculatePayBreakdown } from './lib/payCalculations'
+import { applyLocationMultiplier } from './lib/budgetCalculations'
 import { STEPS } from './lib/steps'
 import type { StepId } from './lib/steps'
 import { CareerSelector } from './components/CareerSelector'
+import { LocationSelector } from './components/LocationSelector'
+import { PayReveal } from './components/PayReveal'
 import { HousingSelector } from './components/HousingSelector'
 import { UtilitiesSelector } from './components/UtilitiesSelector'
 import { TransportSelector } from './components/TransportSelector'
@@ -14,13 +18,17 @@ import { StepProgress } from './components/StepProgress'
 import { StepHeading } from './components/StepHeading'
 import { WizardNav } from './components/WizardNav'
 import { ResultsScreen } from './components/ResultsScreen'
+import { QrCodeBadge } from './components/QrCodeBadge'
+import { LandingScreen } from './components/LandingScreen'
 
 /** Gives the player a moment to see a card highlight before the step changes. */
-const ADVANCE_DELAY_MS = 450
+const ADVANCE_DELAY_MS = 300
 
 function App() {
+  const [hasStarted, setHasStarted] = useState(false)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [selectedCareerId, setSelectedCareerId] = useState<string | null>(null)
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
   const [selectedHousingId, setSelectedHousingId] = useState<string | null>(null)
   const [selectedUtilitiesId, setSelectedUtilitiesId] = useState<string | null>(null)
   const [selectedTransportId, setSelectedTransportId] = useState<string | null>(null)
@@ -29,20 +37,46 @@ function App() {
   const [returnToResults, setReturnToResults] = useState(false)
 
   const selectedCareer = careers.find((career) => career.id === selectedCareerId) ?? null
+  const selectedLocation = locations.find((location) => location.id === selectedLocationId) ?? null
   const selectedHousing = housingOptions.find((option) => option.id === selectedHousingId) ?? null
   const selectedUtilities = utilitiesOptions.find((option) => option.id === selectedUtilitiesId) ?? null
   const selectedTransport = transportOptions.find((option) => option.id === selectedTransportId) ?? null
 
-  const monthlyIncome = selectedCareer ? calculateMonthlyTakeHome(selectedCareer.annualSalary) : 0
-  const monthlyHousingCost = selectedHousing?.monthlyCost ?? 0
-  const monthlyUtilitiesCost = selectedUtilities?.monthlyCost ?? 0
-  const monthlyTransportCost = selectedTransport?.monthlyCost ?? 0
+  const locationMultiplier = selectedLocation?.multiplier ?? 1
+
+  const annualSalary = selectedCareer && selectedLocation ? selectedCareer.annualSalary * locationMultiplier : 0
+  const payBreakdown = calculatePayBreakdown(annualSalary)
+  const monthlyIncome = selectedCareer && selectedLocation ? payBreakdown.monthlyTakeHome : 0
+  const monthlyHousingCost = selectedHousing ? applyLocationMultiplier(selectedHousing.monthlyCost, locationMultiplier) : 0
+  const monthlyUtilitiesCost = selectedUtilities
+    ? applyLocationMultiplier(selectedUtilities.monthlyCost, locationMultiplier)
+    : 0
+  const monthlyTransportCost = selectedTransport
+    ? applyLocationMultiplier(selectedTransport.monthlyCost, locationMultiplier)
+    : 0
 
   const currentStep = STEPS[currentStepIndex]
   const isResultsStep = currentStep.id === 'results'
   const resultsStepIndex = STEPS.findIndex((step) => step.id === 'results')
 
+  const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [currentStepIndex])
+
+  useEffect(() => {
+    document.title = hasStarted ? `${currentStep.title} – Money Life Sim` : 'Money Life Sim'
+  }, [hasStarted, currentStep.title])
+
+  useEffect(() => {
+    return () => {
+      if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current)
+    }
+  }, [])
+
   function goToPreviousStep() {
+    if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current)
     setCurrentStepIndex((index) => Math.max(0, index - 1))
   }
 
@@ -57,8 +91,9 @@ function App() {
   }
 
   function selectAndAdvance(setSelection: (id: string) => void, id: string) {
+    if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current)
     setSelection(id)
-    setTimeout(goToNextStep, ADVANCE_DELAY_MS)
+    advanceTimeoutRef.current = setTimeout(goToNextStep, ADVANCE_DELAY_MS)
   }
 
   function jumpToStep(stepId: StepId) {
@@ -68,6 +103,7 @@ function App() {
 
   function restart() {
     setSelectedCareerId(null)
+    setSelectedLocationId(null)
     setSelectedHousingId(null)
     setSelectedUtilitiesId(null)
     setSelectedTransportId(null)
@@ -77,12 +113,27 @@ function App() {
     setCurrentStepIndex(0)
   }
 
+  if (!hasStarted) {
+    return (
+      <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-sky-100 via-indigo-50 to-pink-100 px-3 py-4 sm:px-4 sm:py-10">
+        <main>
+          <LandingScreen onStart={() => setHasStarted(true)} />
+        </main>
+        <QrCodeBadge />
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-100 via-indigo-50 to-pink-100 px-4 py-10">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-sky-100 via-indigo-50 to-pink-100 px-3 py-4 sm:px-4 sm:py-10">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-8 text-center">
-          <h1 className="text-4xl font-extrabold text-indigo-900 sm:text-5xl">💰 Money Life Sim</h1>
-          <p className="mt-2 text-lg font-medium text-indigo-700">Build your life, one choice at a time!</p>
+        <header className="mb-4 text-center sm:mb-8">
+          <h1 className="text-2xl font-extrabold text-indigo-900 sm:text-5xl">
+            <span aria-hidden="true">💰</span> Money Life Sim
+          </h1>
+          <p className="mt-1 text-sm font-medium text-indigo-700 sm:mt-2 sm:text-lg">
+            Build your life, one choice at a time!
+          </p>
         </header>
 
         <StepProgress
@@ -91,7 +142,11 @@ function App() {
           stepTitle={currentStep.title}
         />
 
-        <div className="flex min-h-[55vh] flex-col justify-center">
+        <p role="status" aria-live="polite" className="sr-only">
+          Level {currentStepIndex + 1} of {STEPS.length}: {currentStep.title}
+        </p>
+
+        <main className="flex flex-col sm:min-h-[55vh] sm:justify-center">
           {currentStep.id === 'career' && (
             <div>
               <StepHeading icon={currentStep.icon} title={currentStep.title} />
@@ -102,12 +157,32 @@ function App() {
             </div>
           )}
 
+          {currentStep.id === 'location' && (
+            <div>
+              <StepHeading icon={currentStep.icon} title={currentStep.title} />
+              <LocationSelector
+                selectedLocationId={selectedLocationId}
+                onSelectLocation={(id) => selectAndAdvance(setSelectedLocationId, id)}
+              />
+            </div>
+          )}
+
+          {currentStep.id === 'pay' && selectedCareer && selectedLocation && (
+            <PayReveal
+              career={selectedCareer}
+              location={selectedLocation}
+              pay={payBreakdown}
+              onContinue={goToNextStep}
+            />
+          )}
+
           {currentStep.id === 'housing' && (
             <div>
               <StepHeading icon={currentStep.icon} title={currentStep.title} />
               <HousingSelector
                 selectedHousingId={selectedHousingId}
                 onSelectHousing={(id) => selectAndAdvance(setSelectedHousingId, id)}
+                locationMultiplier={locationMultiplier}
               />
             </div>
           )}
@@ -118,6 +193,7 @@ function App() {
               <UtilitiesSelector
                 selectedUtilitiesId={selectedUtilitiesId}
                 onSelectUtilities={(id) => selectAndAdvance(setSelectedUtilitiesId, id)}
+                locationMultiplier={locationMultiplier}
               />
             </div>
           )}
@@ -128,6 +204,7 @@ function App() {
               <TransportSelector
                 selectedTransportId={selectedTransportId}
                 onSelectTransport={(id) => selectAndAdvance(setSelectedTransportId, id)}
+                locationMultiplier={locationMultiplier}
               />
             </div>
           )}
@@ -138,6 +215,7 @@ function App() {
               monthlyHousingCost={monthlyHousingCost}
               monthlyUtilitiesCost={monthlyUtilitiesCost}
               monthlyTransportCost={monthlyTransportCost}
+              locationMultiplier={locationMultiplier}
               selectedFoodId={selectedFoodId}
               onSelectFood={setSelectedFoodId}
               selectedSavingsId={selectedSavingsId}
@@ -146,10 +224,12 @@ function App() {
               onRestart={restart}
             />
           )}
-        </div>
+        </main>
 
-        <WizardNav onPrevious={goToPreviousStep} canGoPrevious={currentStepIndex > 0} />
+        {currentStepIndex > 0 && <WizardNav onPrevious={goToPreviousStep} />}
       </div>
+
+      <QrCodeBadge />
     </div>
   )
 }

@@ -1,3 +1,35 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/*
+ * Keeps a keyboard-focused element from landing under the sticky progress
+ * bar at the top, or the fixed QR code badge (desktop only) at the bottom.
+ */
+html {
+  scroll-padding-top: 7rem;
+}
+
+@media (min-width: 1024px) {
+  html {
+    scroll-padding-bottom: 15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}

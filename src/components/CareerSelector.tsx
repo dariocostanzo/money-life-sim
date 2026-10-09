@@ -8,13 +8,14 @@ type CareerSelectorProps = {
 
 export function CareerSelector({ selectedCareerId, onSelectCareer }: CareerSelectorProps) {
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {careers.map((career) => (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
+      {careers.map((career, index) => (
         <CareerCard
           key={career.id}
           career={career}
           isSelected={career.id === selectedCareerId}
           onSelect={onSelectCareer}
+          index={index}
         />
       ))}
     </div>
